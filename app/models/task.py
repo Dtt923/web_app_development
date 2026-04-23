@@ -1,82 +1,124 @@
 import sqlite3
 import os
-from contextlib import closing
 
-# 設定資料庫路徑 (對應架構文件設定的 instance/database.db)
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'instance', 'database.db')
+# 定義資料庫路徑
+DATABASE_PATH = os.path.join('instance', 'database.db')
+
+def get_db_connection():
+    """
+    建立並回傳與 SQLite 資料庫的連線。
+    設定 row_factory 為 sqlite3.Row 以便透過欄位名稱存取資料。
+    """
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except sqlite3.Error as e:
+        print(f"資料庫連線錯誤: {e}")
+        raise
 
 class Task:
     @staticmethod
-    def get_connection():
-        """獲取資料庫連接，並開啟 Row-factory 讓取出的資料可以轉作 dictionary 存取"""
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def create(data):
+        """
+        新增一筆任務記錄。
+        參數 data 為包含 title, description, due_date 的字典。
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                '''
+                INSERT INTO tasks (title, description, due_date)
+                VALUES (?, ?, ?)
+                ''',
+                (data.get('title'), data.get('description'), data.get('due_date'))
+            )
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.Error as e:
+            print(f"新增任務錯誤: {e}")
+            return False
 
-    @classmethod
-    def create(cls, title, description, due_date):
-        """新增一個任務"""
-        with closing(cls.get_connection()) as conn:
-            with conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    '''
-                    INSERT INTO tasks (title, description, due_date)
-                    VALUES (?, ?, ?)
-                    ''',
-                    (title, description, due_date)
-                )
-                return cursor.lastrowid
-
-    @classmethod
-    def get_all(cls):
-        """取得所有任務清單"""
-        with closing(cls.get_connection()) as conn:
+    @staticmethod
+    def get_all():
+        """
+        取得所有任務記錄，依據建立時間反向排序。
+        """
+        try:
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM tasks ORDER BY created_at DESC')
-            return cursor.fetchall()
+            tasks = cursor.fetchall()
+            conn.close()
+            return tasks
+        except sqlite3.Error as e:
+            print(f"取得所有任務錯誤: {e}")
+            return []
 
-    @classmethod
-    def get_by_id(cls, task_id):
-        """根據 ID 取得單一任務"""
-        with closing(cls.get_connection()) as conn:
+    @staticmethod
+    def get_by_id(task_id):
+        """
+        根據 ID 取得單筆任務記錄。
+        """
+        try:
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
-            return cursor.fetchone()
+            task = cursor.fetchone()
+            conn.close()
+            return task
+        except sqlite3.Error as e:
+            print(f"取得單筆任務錯誤: {e}")
+            return None
 
-    @classmethod
-    def update(cls, task_id, title, description, due_date):
-        """更新任務的資訊"""
-        with closing(cls.get_connection()) as conn:
-            with conn:
-                conn.execute(
-                    '''
-                    UPDATE tasks
-                    SET title = ?, description = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    ''',
-                    (title, description, due_date, task_id)
-                )
+    @staticmethod
+    def update(task_id, data):
+        """
+        更新特定 ID 的任務記錄。
+        參數 data 包含要更新的欄位字典。
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            update_fields = []
+            parameters = []
+            for key, value in data.items():
+                if key in ['title', 'description', 'due_date', 'is_completed']:
+                    update_fields.append(f"{key} = ?")
+                    parameters.append(value)
+            
+            # 同時更新 updated_at 為當下時間
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            
+            if not update_fields:
+                return False
                 
-    @classmethod
-    def toggle_status(cls, task_id):
-        """切換任務的未完成/已完成狀態"""
-        with closing(cls.get_connection()) as conn:
-            with conn:
-                conn.execute(
-                    '''
-                    UPDATE tasks
-                    SET is_completed = CASE WHEN is_completed = 1 THEN 0 ELSE 1 END,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    ''',
-                    (task_id,)
-                )
+            query = f"UPDATE tasks SET {', '.join(update_fields)} WHERE id = ?"
+            parameters.append(task_id)
+            
+            cursor.execute(query, tuple(parameters))
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.Error as e:
+            print(f"更新任務錯誤: {e}")
+            return False
 
-    @classmethod
-    def delete(cls, task_id):
-        """刪除指定任務"""
-        with closing(cls.get_connection()) as conn:
-            with conn:
-                conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+    @staticmethod
+    def delete(task_id):
+        """
+        根據 ID 刪除單筆任務記錄。
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.Error as e:
+            print(f"刪除任務錯誤: {e}")
+            return False

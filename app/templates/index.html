@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <!-- 新增任務表單 -->
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h5 class="card-title fw-bold mb-0">新增任務</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('task_bp.create_task') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="title" class="form-label text-muted small fw-bold">任務標題 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control bg-light border-0" id="title" name="title" placeholder="輸入待辦事項..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label text-muted small fw-bold">詳細描述</label>
+                        <textarea class="form-control bg-light border-0" id="description" name="description" rows="3" placeholder="（選填）加入更多細節"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label for="due_date" class="form-label text-muted small fw-bold">到期日</label>
+                        <input type="date" class="form-control bg-light border-0" id="due_date" name="due_date">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
+                        <i class="bi bi-plus-lg"></i> 建立任務
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任務清單 -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title fw-bold mb-0">任務清單</h5>
+                <!-- 過濾器 -->
+                <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ url_for('task_bp.index') }}" class="btn btn-outline-primary {{ 'active' if not current_filter }}">全部</a>
+                    <a href="{{ url_for('task_bp.index', status='pending') }}" class="btn btn-outline-primary {{ 'active' if current_filter == 'pending' }}">未完成</a>
+                    <a href="{{ url_for('task_bp.index', status='completed') }}" class="btn btn-outline-primary {{ 'active' if current_filter == 'completed' }}">已完成</a>
+                </div>
+            </div>
+            
+            <ul class="list-group list-group-flush pb-2">
+                {% if tasks %}
+                    {% for task in tasks %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3 {{ 'bg-light border-light' if task.is_completed else '' }}">
+                        <div class="d-flex align-items-start w-100">
+                            <!-- Toggle 完成狀態按鈕 -->
+                            <form action="{{ url_for('task_bp.toggle_task', id=task.id) }}" method="POST" class="me-3 mt-1">
+                                <button type="submit" class="btn btn-sm btn-link p-0 text-decoration-none shadow-none">
+                                    {% if task.is_completed %}
+                                    <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                                    {% else %}
+                                    <i class="bi bi-circle text-secondary fs-4"></i>
+                                    {% endif %}
+                                </button>
+                            </form>
+                            
+                            <!-- 任務內容 -->
+                            <div class="flex-grow-1 pe-3">
+                                <h6 class="mb-1 fw-bold {{ 'text-decoration-line-through text-muted' if task.is_completed else 'text-dark' }}">
+                                    {{ task.title }}
+                                </h6>
+                                {% if task.description %}
+                                <p class="mb-1 small {{ 'text-muted' if task.is_completed else 'text-secondary' }}">
+                                    {{ task.description }}
+                                </p>
+                                {% endif %}
+                                {% if task.due_date %}
+                                <small class="{{ 'text-muted' if task.is_completed else 'text-primary' }} fw-semibold">
+                                    <i class="bi bi-calendar-event"></i> {{ task.due_date }}
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- 編輯與刪除按鈕 -->
+                        <div class="btn-group">
+                            <a href="{{ url_for('task_bp.edit_task', id=task.id) }}" class="btn btn-sm btn-light text-primary" title="編輯">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            <form action="{{ url_for('task_bp.delete_task', id=task.id) }}" method="POST" class="d-inline" onsubmit="return confirm('確定要刪除這筆任務嗎？這項動作無法復原。');">
+                                <button type="submit" class="btn btn-sm btn-light text-danger" title="刪除">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="list-group-item text-center text-muted py-5 border-0">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 text-light"></i>
+                        目前沒有符合條件的任務，來新增一筆吧！
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
